@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	p2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/orochi-network/orochimaru/keypair"
 	"github.com/orochi-network/orochimaru/network"
 )
@@ -12,7 +13,7 @@ func main() {
 	var nodeKey *keypair.KeyPair
 	if _, err := os.Stat(keyfile); err != nil {
 		// Create a new key pair
-		nodeKey, err = keypair.New()
+		nodeKey, err = keypair.New(p2pCrypto.Ed25519, 256)
 		if err != nil {
 			log.Panic(err)
 		}

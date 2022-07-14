@@ -19,6 +19,7 @@ type KeyPair struct {
 
 // JSON structure
 type JSON struct {
+	KeyType int    `json:"type"`
 	SignKey bool   `json:"signKey"`
 	Key     string `json:"key"`
 }
@@ -133,7 +134,7 @@ func LoadFromFile(fileName string) (*KeyPair, error) {
 		err := json.Unmarshal(fileContent, jsonKey)
 		if err == nil {
 			if jsonKey.SignKey {
-				return FromBase64PrivateKey(jsonKey.Key)
+				return FromBase64PrivateKey(jsonKey.KeyType, jsonKey.Key)
 			}
 			return FromBase64PublicKey(jsonKey.Key)
 		}
