@@ -12,6 +12,7 @@ import (
 
 // KeyPair structure
 type KeyPair struct {
+	keyType int
 	privKey p2pCrypto.PrivKey
 	pubKey  p2pCrypto.PubKey
 }
@@ -22,37 +23,63 @@ type JSON struct {
 	Key     string `json:"key"`
 }
 
-// New define new key pair
-func New() (*KeyPair, error) {
-	p, v, err := p2pCrypto.GenerateKeyPairWithReader(p2pCrypto.Ed25519, 256, rand.Reader)
+// NewEd25519 generates a new Ed25519 KeyPair
+func NewEd25519() (*KeyPair, error) {
+	return New(p2pCrypto.Ed25519, 256)
+}
+
+// NewSecp256k1 generate a new Secp256k1 KeyPair
+func NewSecp256k1() (*KeyPair, error) {
+	return New(p2pCrypto.Secp256k1, 256)
+}
+
+// New generate a new key pair
+func New(typ int, bits int) (*KeyPair, error) {
+	p, v, err := p2pCrypto.GenerateKeyPairWithReader(typ, bits, rand.Reader)
 	if err == nil {
-		return &KeyPair{privKey: p, pubKey: v}, nil
+		return &KeyPair{keyType: typ, privKey: p, pubKey: v}, nil
 	}
 	return nil, err
 }
 
-// FromPrivKey restore key pair in base64
-func FromPrivKey(b string) (*KeyPair, error) {
-	data, err := p2pCrypto.ConfigDecodeKey(b)
+// FromPrivateKey restore a KeyPair from a raw private key
+func FromPrivateKey(typ int, b []byte) (*KeyPair, error) {
+	var p p2pCrypto.PrivKey
+	var err error
+	if typ == p2pCrypto.Ed25519 {
+		p, err = p2pCrypto.UnmarshalEd25519PrivateKey(b)
+	} else if typ == p2pCrypto.Secp256k1 {
+		p, err = p2pCrypto.UnmarshalSecp256k1PrivateKey(b)
+	}
 	if err == nil {
-		p, err := p2pCrypto.UnmarshalEd25519PrivateKey(data)
-		if err == nil {
-			return &KeyPair{privKey: p, pubKey: p.GetPublic()}, nil
-		}
-		return nil, err
+		return &KeyPair{privKey: p, pubKey: p.GetPublic()}, nil
 	}
 	return nil, err
 }
 
-// FromPubKey restore key pair in base64, this is verify only
-func FromPubKey(b string) (*KeyPair, error) {
-	data, err := p2pCrypto.ConfigDecodeKey(b)
+// FromBase64PrivateKey restore a KeyPair from a base 64 private key
+func FromBase64PrivateKey(typ int, b string) (*KeyPair, error) {
+	p, err := p2pCrypto.ConfigDecodeKey(b)
 	if err == nil {
-		v, err := p2pCrypto.UnmarshalEd25519PublicKey(data)
-		if err == nil {
-			return &KeyPair{privKey: nil, pubKey: v}, nil
-		}
-		return nil, err
+		return FromPrivateKey(typ, p)
+	}
+	return nil, err
+}
+
+// FromPublicKey restore a KeyPair from a raw public key
+func FromPublicKey(b []byte) (*KeyPair, error) {
+	v, err := p2pCrypto.UnmarshalEd25519PublicKey(b)
+	if err == nil {
+		return &KeyPair{pubKey: v}, nil
+	}
+	return nil, err
+}
+
+// FromBase64PublicKey restore KeyPair from its public key, this key can not use to sign
+func FromBase64PublicKey(b string) (*KeyPair, error) {
+	v, err := p2pCrypto.ConfigDecodeKey(b)
+	if err == nil {
+		return FromPublicKey(v)
 	}
 	return nil, err
 }
@@ -106,9 +133,9 @@ func LoadFromFile(fileName string) (*KeyPair, error) {
 		err := json.Unmarshal(fileContent, jsonKey)
 		if err == nil {
 			if jsonKey.SignKey {
-				return FromPrivKey(jsonKey.Key)
+				return FromBase64PrivateKey(jsonKey.Key)
 			}
-			return FromPubKey(jsonKey.Key)
+			return FromBase64PublicKey(jsonKey.Key)
 		}
 		return nil, err
 	}
